@@ -11,10 +11,14 @@
 
 set -euo pipefail
 
+# Note: the token body is letters only — `[a-zA-Z]{34}`, no digits. Including
+# digits yields a string that *looks* right but is not detected, so the push
+# would silently succeed. This was found the hard way; see SCRIPT.md Appendix A.
+#
 # Note: read a bounded chunk first, and finish with `cut` rather than `head`.
-# `head -c` closes the pipe early, which kills `tr` with SIGPIPE and trips
-# `pipefail`, silently yielding an empty token.
+# `head -c` closes the pipe early, killing `tr` with SIGPIPE, which trips
+# `pipefail` and silently yields an empty token.
 PREFIX="h""f_"
-BODY="$(head -c 2048 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-34)"
+BODY="$(head -c 4096 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z' | cut -c1-34)"
 
 printf '%s%s\n' "$PREFIX" "$BODY"
