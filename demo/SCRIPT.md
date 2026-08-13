@@ -4,8 +4,8 @@ Total run time: about 90 seconds. Rehearse once before presenting — step 4 is 
 
 ## Before you start
 
+- [ ] **Run `./demo/preflight.sh` — it must print `Ready to demo.`** See [Appendix A](#appendix-a--preflight-and-the-two-silent-failures)
 - [ ] Repo is cloned locally and `git status` is clean
-- [ ] Push protection is **on** (Settings → Code security → Push protection). Verify with the command in [Appendix A](#appendix-a--verify-push-protection-is-on)
 - [ ] Terminal font size raised to ~18pt — the block message is the hero shot and it must be legible in a deck
 - [ ] Terminal window sized so the full block message fits without scrolling
 - [ ] You are **not** in a screen-share that hides your terminal's colour output
@@ -92,18 +92,44 @@ For shot 3, capture the terminal at 2x/Retina. Cropped, upscaled terminal text l
 
 ---
 
-## Appendix A — verify push protection is on
+## Appendix A — preflight, and the two silent failures
+
+**Run this before every demo:**
+
+```bash
+./demo/preflight.sh
+```
+
+It must print `Ready to demo.` Do not skip it. Both failure modes below are silent — they don't produce an error, they produce a push that quietly **succeeds**, which demonstrates the exact opposite of the intended message.
+
+### Silent failure 1 — push protection is off
 
 ```bash
 gh api repos/OWNER/REPO --jq '.security_and_analysis.secret_scanning_push_protection.status'
 ```
 
-Expect `enabled`. If it returns `disabled`, the demo will silently *succeed* at pushing the secret — the worst possible failure mode in front of an audience. Check this every time; it takes two seconds.
+Expect `enabled`. If it returns `disabled`, the secret is pushed and lands on the remote.
 
-Afterwards, confirm nothing landed:
+### Silent failure 2 — the token doesn't match the pattern
+
+The token body must be **letters only**: `hf_` followed by `[a-zA-Z]{34}`.
+
+A body containing **digits** — `hf_zYTIKZbMIJVwWfOOiS8CiG4KlbMvg9SkL1` — is the right length and looks entirely plausible, but is **not detected**. The push sails straight through.
+
+This was established empirically: pushing five candidates in one commit, the letters-only ones were each reported by the block, and the digit-bearing ones were not flagged at all. Mutating individual letters of a known-good token still triggers detection, so this is a character-class constraint, not a checksum.
+
+`make-demo-secret.sh` generates letters-only bodies. If you hand-craft a token, verify it:
 
 ```bash
-gh api repos/OWNER/REPO/secret-scanning/alerts --jq 'length'
+echo "$TOKEN" | grep -qE '^hf_[A-Za-z]{34}$' && echo ok || echo "WILL NOT FIRE"
 ```
 
-Expect `0`.
+### Afterwards
+
+Confirm nothing landed:
+
+```bash
+gh api repos/OWNER/REPO/secret-scanning/alerts --jq 'length'   # expect 0
+```
+
+If that ever returns non-zero, the demo leaked. Reset and force-push to the last clean commit, then re-check.
